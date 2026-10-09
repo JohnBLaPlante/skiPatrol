@@ -626,15 +626,6 @@ cat("All metrics stored in Model Registry\n")
 #| label: registry-compare
 versions <- sfr_show_model_versions(reg, "SFR_CREDIT_RISK_SCORER")
 
-# Compare only the two versions registered above. The model persists across
-# runs (00_setup.qmd uses CREATE ... IF NOT EXISTS), so an earlier run's
-# versions -- including any logged before task= was set -- are still in the
-# registry. If one of those had the best roc_auc it became the champion and
-# sfr_add_monitor() then failed with "Registry model must be logged with task
-# in order to be monitored" (seen 8 Oct).
-this_run <- c(mv_lr$version_name, mv_xgb$version_name)
-versions <- versions[versions$name %in% this_run, , drop = FALSE]
-
 metrics_list <- Filter(Negate(is.null), lapply(versions$name, function(vn) {
   m <- sfr_show_model_metrics(reg, "SFR_CREDIT_RISK_SCORER", vn)
   if (length(m) == 0 || is.null(m$roc_auc)) return(NULL)
@@ -699,7 +690,7 @@ if (service_ready && !FORCE_REDEPLOY) {
   cat("Service already READY -- skipping redeploy (set FORCE_REDEPLOY <- TRUE to force).\n")
 } else {
   deploy_start <- Sys.time()
-  sfr_create_compute_pool(conn, CR_COMPUTE_POOL,
+  sfr_create_compute_pool(conn, "R_CREDIT_POOL",
                           instance_family = "CPU_X64_M")
   sfr_create_image_repo(conn, fqn_model("R_CREDIT_IMAGES"))
   sfr_execute(conn, paste("DROP SERVICE IF EXISTS", svc_fqn))
@@ -709,7 +700,7 @@ if (service_ready && !FORCE_REDEPLOY) {
     model_name   = "SFR_CREDIT_RISK_SCORER",
     version_name = champion_ver,
     service_name = "credit_risk_svc",
-    compute_pool = CR_COMPUTE_POOL,
+    compute_pool = "R_CREDIT_POOL",
     image_repo   = fqn_model("R_CREDIT_IMAGES"),
     force        = TRUE,
     autocapture  = TRUE
@@ -773,11 +764,8 @@ svc_fn   <- paste(CR_DATABASE, CR_REGISTRY_SCHEMA,
                   "CREDIT_RISK_SVC!PREDICT", sep = ".")
 col_list <- paste(names(input_cols), collapse = ", ")
 
-# The service function returns an OBJECT (e.g. {"prediction": "no"}), not a
-# plain string -- extract the field, otherwise the demo displays the raw
-# JSON instead of a clean value (found live in the Native App, 7 Sep).
 sql_score <- paste(
-  "SELECT *,", svc_fn, "(", col_list, "):prediction::STRING AS prediction",
+  "SELECT *,", svc_fn, "(", col_list, ") AS prediction",
   "FROM", fqn_training("CREDIT_RISK_TRAINING"),
   "LIMIT 10"
 )
@@ -852,7 +840,7 @@ sfr_query(conn, detail_sql)
 **Optional extra** — skip this section for a shorter demo; it doesn't affect anything
 before it. Sets up drift/performance monitoring on the deployed model via
 `skiPatrol`'s Model Monitoring API (`R/monitoring.R`), backed by Snowflake's
-`MODEL_MONITOR_*` SQL functions. See `skiPatrol/vignettes/model-monitoring.Rmd` for
+`MODEL_MONITOR_*` SQL functions. See `snowdropML/vignettes/model-monitoring.Rmd` for
 the general API and Snowflake's own Model Registry/Monitoring docs for the underlying
 concepts.
 
@@ -972,7 +960,7 @@ service.
 
 # Drop SPCS services before deleting the model
 # sfr_execute(conn, paste("DROP SERVICE IF EXISTS", svc_fqn))
-# sfr_execute(conn, paste("DROP COMPUTE POOL IF EXISTS", CR_COMPUTE_POOL))
+# sfr_execute(conn, paste("DROP COMPUTE POOL IF EXISTS R_CREDIT_POOL"))
 
 # Drop model
 # sfr_execute(conn, paste(

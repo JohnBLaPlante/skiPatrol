@@ -28,16 +28,7 @@ CR_DATABASE        <- "CREDIT_RISK_ML"
 CR_SOURCE_SCHEMA   <- "RAW_DATA"
 CR_FEATURE_SCHEMA  <- "FEATURES"
 CR_TRAINING_SCHEMA <- "TRAINING"
-# Registry schema: holds the model, its versions, the deployed service, the
-# image repository and INFERENCE_LOG. The model persists between runs, so two
-# people running the demo in one account must use different values here or
-# they share (and overwrite) each other's model and service. Create the schema
-# first if it doesn't exist: CREATE SCHEMA IF NOT EXISTS <db>.<schema>;
-CR_REGISTRY_SCHEMA <- Sys.getenv("CR_REGISTRY_SCHEMA", "MODELS_JOHN")
-
-# Compute pool for the deployed service. A pool defaults to one node, so give
-# each person their own if two services would otherwise compete for it.
-CR_COMPUTE_POOL <- Sys.getenv("CR_COMPUTE_POOL", "R_CREDIT_POOL_JOHN")
+CR_REGISTRY_SCHEMA <- "MODELS"
 
 # -- Helpers ------------------------------------------------------------------
 fqn_source  <- function(name) paste(CR_DATABASE, CR_SOURCE_SCHEMA, name, sep = ".")
